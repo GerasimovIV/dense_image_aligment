@@ -1,0 +1,14 @@
+[tool.poetry]
+name = "dense-image-aligment"
+version = "0.1.0"
+description = "Package for image alignment with dense methods"
+authors = ["Ivan Gerasimov <gerasimovv1999@gmail.com>"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.10"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
