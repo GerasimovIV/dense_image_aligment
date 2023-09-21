@@ -6,6 +6,8 @@ import numpy as np
 from PIL import Image
 from tqdm import tqdm
 
+from .transformations.base_transformation import BaseTransform
+
 
 def read_as_grayscale(p: str) -> np.ndarray:
     """
@@ -61,7 +63,7 @@ def read_as_colored(p: str) -> np.ndarray:
 def show_data(
     image: np.ndarray,
     template: np.ndarray,
-    mat_affine: np.ndarray
+    coords_transform: BaseTransform,
 ) -> None:
     """
     show_data helper function for visualization
@@ -76,18 +78,13 @@ def show_data(
         matrix of affine transformation
         that was used for input image
     """
-    p = mat_affine
-    image_wrapped = cv2.warpAffine(
-        image,
-        p,
-        template.shape[::-1]
-    )
+    image_warpped = coords_transform.apply_transformation(image=image, shape=template.shape)
 
     image_with_template = np.mean(
         np.concatenate(
             [
                 template[None],
-                image_wrapped[None],
+                image_warpped[None],
             ],
             axis=0
         ),
@@ -97,9 +94,11 @@ def show_data(
     h, w = image.shape
 
     a = np.array([[0, 0, w, w],
-                  [0, h, h, 0],
-                  [1, 1, 1, 1]])
-    b = p.dot(a)
+                  [0, h, h, 0]]).T
+
+    b = coords_transform.apply_transformation_to_coordinates(
+        coords=a
+    ).T
 
     fig, axs = plt.subplots()
     axs.matshow(image_with_template, cmap=plt.cm.gray)
@@ -110,7 +109,8 @@ def save_aligment_progress(
     filename: str,
     image: np.ndarray,
     template: np.ndarray,
-    mat_affine_list: List[np.ndarray],
+    coords_transform: BaseTransform,
+    ps: List[np.ndarray],
     duration: float = 200
 ) -> None:
     """
@@ -126,15 +126,17 @@ def save_aligment_progress(
         source image, which is not changed during aligment
     template : np.ndarray
         image that should be matched with "image"
-    mat_affine_list : List[np.ndarray]
-        list of affine transformations (their matrixes 2x3)
+    coords_transform: BaseTransform
+        coordinates transform
+    ps : List[np.ndarray]
+        list of parameters for coords transformation (their matrixes 2x3)
     duration : float, optional
         time in ms between frames in .gif file, by default 200
     """
 
     h, w = image.shape
 
-    process_bar = tqdm(mat_affine_list)
+    process_bar = tqdm(ps)
 
     fig, axs = plt.subplots()
     images = []
@@ -142,26 +144,25 @@ def save_aligment_progress(
     for p in process_bar:
         fig.tight_layout()
 
-        a = np.array([[0, 0, w, w],
-                  [0, h, h, 0],
-                  [1, 1, 1, 1]])
-        b = p.dot(a)
-
-        image_wrapped = cv2.warpAffine(
-            image,
-            p,
-            template.shape[::-1]
-        )
+        coords_transform.p = p
+        image_warpped = coords_transform.apply_transformation(image=image, shape=template.shape)
 
         image_with_template = np.mean(
             np.concatenate(
                 [
                     template[None],
-                    image_wrapped[None],
+                    image_warpped[None],
                 ],
                 axis=0
             ),
             axis=0)
+
+        a = np.array([[0, 0, w, w],
+                  [0, h, h, 0]]).T
+
+        b = coords_transform.apply_transformation_to_coordinates(
+            coords=a
+        ).T
 
         axs.matshow(image_with_template, cmap=plt.cm.gray)
         axs.plot(b[0, [0, 1, 2, 3, 0]], b[1, [0, 1, 2, 3, 0]], '-or')

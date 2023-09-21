@@ -1,20 +1,23 @@
+from copy import copy
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
 import cv2
 import numpy as np
 from tqdm import tqdm
 
-from .utils import grad_image
+from .transformations.base_transformation import BaseTransform
+from .utils import compute_H, compute_image_grad, compute_J
 
 
 def forward_additive(
     template: np.ndarray,
     image: np.ndarray,
+    coord_transform: BaseTransform,
     p_init: Optional[np.ndarray] = None,
     max_iterations: int = 200,
     convergence_threshold: float = 1e-4,
     alpha: float = 1.,
-    verbose: bool = True
+    verbose: bool = True,
 ) -> List[np.ndarray]:
     '''Lucas-Kanade forward additive method (Fig. 1) for affine warp model.
 
@@ -23,8 +26,11 @@ def forward_additive(
             A grayscale image of shape (height, width).
         image (numpy.ndarray):
             A template image (height_t, width_t).
-        p_init (numpy.ndarray):
-            Initial parameter of affine transform which shape is (2, 3).
+        coord_transform (BaseTransform):
+            image warp
+        p_init (Optional[numpy.ndarray]):
+            Initial parameters for image warp,
+            if it is not given internal parameters in coord_transform will be used
         max_iterations (int):
             number of iteration
         convergence_threshold (float):
@@ -36,79 +42,40 @@ def forward_additive(
         ps (list):
             Estimates of parameters (p) for each iteration.
     '''
-
-    # Warp function W(x; p) is a mapping from x_template to x_image
-    height, width = template.shape
-    gx_template, gy_template = grad_image(template)
-
-    # initialize p
-    if p_init is not None:
-        p = p_init.copy()
-    else:
-        p = np.array([[1.2, 0.0, 50],
-                      [0.0, 1.2, 70]], dtype='d')
-    ps = [p.copy()]
-
     progression_bar = tqdm(range(max_iterations), disable=not verbose)
 
+    p_c = copy(p_init) if p_init is not None else copy(coord_transform.p)
+
+    ps = [p_c]
+
     for it in progression_bar:
-        p_inv = cv2.invertAffineTransform(p)
-        # step (1)
-        template_w = cv2.warpAffine(template, p_inv, image.shape[::-1])
+        coord_transform.p = p_c
 
-        # step (2)
-        error = image - template_w
+        I_W = coord_transform.apply_transformation(image=image, shape=template.shape)
 
-        # step (3)
-        gx_template_w = cv2.warpAffine(gx_template, p_inv, image.shape[::-1])
-        gy_template_w = cv2.warpAffine(gy_template, p_inv, image.shape[::-1])
+        J = compute_J(
+            image=I_W,
+            coord_transform=coord_transform,
+            p_c=p_c
+        )
 
-        # step (4)
-        g_template_w_height, g_template_w_width = gx_template_w.shape
-        x, y = np.meshgrid(np.arange(g_template_w_width), np.arange(g_template_w_height))
-        zero = np.zeros_like(x)
-        one = np.ones_like(x)
-        gp_warp = np.array([[x, y, one, zero, zero, zero],
-                            [zero, zero, zero, x, y, one]], dtype='d')
+        H = compute_H(J)
 
-        # step (5)
-        g_template_w = np.stack((gx_template_w, gy_template_w), axis=0)
-        # compute the steepest descent images
-        sd_templates = np.einsum('jhw,jihw->ihw', g_template_w, gp_warp)
+        diff = template.reshape(-1) - I_W.reshape(-1)
 
-        # step (6)
-        sd_templates_flat = sd_templates.reshape(6, -1)
-        hessian = sd_templates_flat.dot(sd_templates_flat.T)
+        delta_p = 1 / H * (np.einsum('Nn,N->n', J, diff))
 
-        # step (7)
-        # steepest descent parameter update
-        sd_updates = sd_templates_flat.dot(error.ravel())
+        p_c = p_c + alpha * delta_p
+        ps.append(p_c)
 
-        # step (8)
-        p_update = sd_updates.dot(np.linalg.inv(hessian)).reshape(p.shape)
+        delta_p_norm = np.linalg.norm(delta_p)
 
-        # step (9)
-        p += p_update * alpha
+        progression_bar.set_description(f'iteration: {it}, |∇p|={delta_p_norm:.5f}')
 
-        ps.append(p.copy())
-
-        delpa_p_norm = np.linalg.norm(p_update)
-
-        progression_bar.set_description(f'iteration: {it}, |∇p|={delpa_p_norm:.5f}')
-
-        # converged?
-        if delpa_p_norm < convergence_threshold:
-            if verbose: print('Converged.')
+        if delta_p_norm <= convergence_threshold:
+            if verbose: print('Converged')
             break
     return ps
-
-
-__p_init_base__ = np.array(
-    [
-        [1., 0., 0.],
-        [0., 1., 0.],
-    ]
-)
 
 
 __methods__ = {
@@ -116,24 +83,11 @@ __methods__ = {
 }
 
 __def_params__ = {
-    'forward_compositional': {
-        'p_init': __p_init_base__,
-        'max_iterations': 200,
-        'convergence_threshold': 1e-4,
-        'verbose': True,
-        },
     'forward_additive': {
-        'p_init': __p_init_base__,
         'max_iterations': 200,
         'convergence_threshold': 1e-4,
         'verbose': True,
         'alpha': 1.0,
-        },
-    'inverse_compositional': {
-        'p_init': __p_init_base__,
-        'max_iterations': 200,
-        'convergence_threshold': 1e-4,
-        'verbose': True,
         },
 }
 
