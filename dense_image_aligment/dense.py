@@ -60,10 +60,12 @@ def forward_additive(
         )
 
         H = compute_H(J)
+        H_inv = np.linalg.inv(H) # n x n
 
         diff = template.reshape(-1) - I_W.reshape(-1)
+        right_part = np.einsum('Nn,N->n', J, diff) # n
 
-        delta_p = 1 / H * (np.einsum('Nn,N->n', J, diff))
+        delta_p =  np.einsum('ij,j->i', H_inv, right_part)
 
         p_c = p_c + alpha * delta_p
         ps.append(p_c)

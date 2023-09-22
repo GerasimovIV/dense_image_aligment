@@ -57,7 +57,7 @@ def compute_J(
         p_c (np.ndarray): set of parameters for W
 
     Returns:
-        np.ndarray: computed for each pixel J(x, p_c) matrix with shape N x n
+        np.ndarray: computed for each pixel J(x, p_c), i.e. matrix with shape N x n
         where N is the number of pixels and n is the number of warp parameters
     """
     nabla_I, x = compute_image_grad(image) # N x 2
@@ -75,8 +75,8 @@ def compute_H(
         J (np.ndarray): see compute_J function in dense_image_alignment.utils.compute_J
 
     Returns:
-        float: exact value
+        np.ndarray: matrix n x n where n is the number of warp parameters
     """
 
-    H = np.einsum('ij,ij->i', J, J).sum()
+    H = np.einsum('ij,ik->ijk', J, J).sum(0)
     return H
