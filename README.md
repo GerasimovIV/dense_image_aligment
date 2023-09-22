@@ -8,14 +8,22 @@
 dense_image_alignment is a Python library for dense image alignment. For more detail about methodology look at brief [explanation](./docs/materials/Image_Alignment_Dense_methods.pdf) materials.
 
 <!-- ![Image Alignment Example](docs/images/example_alignment.png) -->
+<div class="row">
+    <p align="center">
+        <img src="./docs/images/translation_alignment_example.gif" alt="animated" width="200" />
+        <img src="./docs/images/affine_alignment_example.gif" alt="animated" width="200" />
+        <img src="./docs/images/progress_example.gif" alt="animated" width="200" />
+    </p>
+</div>
+
 
 ## Features
 
-- This package contains an implementation for [affine](https://docs.opencv.org/3.4/d4/d61/tutorial_warp_affine.html) image transformation.
+- This implementation may work with any type of warp fucntions, you just need to provide jacobian and exact transformation. How to configure your personal transformation look [here](#configure-custom-transformation).
 - Contains implementations for the first order methods:
-    - Forward Additive
-    - Forward Compositional
-    - Inverse Compositional
+    - ✅ Forward Additive
+    - ❌ Forward Compositional (not implemented yet)
+    - ❌ Inverse Compositional (not implemented yet)
 
 ## Installation
 
@@ -46,47 +54,57 @@ pip install /path/to/dense_image_aligment-0.1.0-py3-none-any.whl
 
 ## Get Started
 
-After you install the package, let's see the example of usage.
+You may look at examples of follow detailed explanation below. Let's start with basic example of using dense methods for image alignment for warp Translation.
 
 1. Importing the necessary processing functions.
 
 ```python
+import numpy as np
+import matplotlib.pyplot as plt
+
 from dense_image_aligment import show_data, image_aligment_method, read_as_grayscale
 from dense_image_aligment import save_aligment_progress, read_as_colored, show_data
-import numpy as np
+from dense_image_aligment.transformations import TranslationTransformation
 ```
 
-2. Read the Input and Template images.
+2. Prepare the Input and Template images.
 
 ```python
-image = read_as_grayscale('./media/kanade_image.jpg')
-templ = read_as_grayscale('./media/kanade.jpg')
+def create_simple_gauss(mu, sigma, shape):
+    x = np.linspace(0, 1, shape[0])
+    y = np.linspace(0, 1, shape[1])
+
+    xx, yy = np.meshgrid(x, y, indexing='xy')
+
+    z = np.exp(-( (xx - mu[0])**2 / (sigma[0]**2) +  (yy - mu[1])**2 / (sigma[1]**2)) / 2) / (np.sqrt(sigma[0]**2 + sigma[1]**2) * np.sqrt(2 * np.pi))
+    return z
+
+
+template = create_simple_gauss([0.5, 0.5], [0.1, 0.1], [100, 100])
+image = create_simple_gauss([0.5, 0.5], [0.1, 0.1], [100, 100])
+
 ```
 
-3. As was shown in [introductory materials](./docs/materials/Image_Alignment_Dense_methods.pdf) dense methods depends from noise and in order to get a good convergence to the local minimum, it is necessary to remove noise as much as possible. We propose to do that with opencv utility, but now for the example the step with denoising is skipped.
-
-4. Let's define method that we want to use and its hyperparameters.
+3. Define method that you want to use and its hyperparameters.
 
 ```python3
 method, params = image_aligment_method(key='forward_additive')
 params['alpha'] = 1.0
-params['max_iterations'] = 500
-params['p_init'] = np.array(
-    [
-        [1, 0.1, 40],
-        [0.2, 1., 70.],
-    ]
-)
+params['max_iterations'] = 100
+params['p_init'] = np.array([30., 20.])
+params['convergence_threshold'] = 1e-8
+
+transform = TranslationTransformation(params['p_init'])
 ```
 
 The function image_aligment_method return reference for choisen method function and the set of its default hyperparameters. In that case we have the set of params:
 
 - p_init:
-$`\begin{bmatrix} 1. & 0.1& 40. \\ 0.2 & 1. & 70. \end{bmatrix}`$
-- max_iterations: 500
-- convergence_threshold: 0.0001
+$`\begin{bmatrix} 30. \\ 20 \end{bmatrix}`$
+- max_iterations: 100
+- convergence_threshold: 1e-8
 - verbose: True
-- alpha: 0.1
+- alpha: 1.0
 
 About all this parameters you can read the docs of function through the `help` like
 
@@ -94,13 +112,13 @@ About all this parameters you can read the docs of function through the `help` l
 help(method)
 ```
 
-5. Check the initial warp parameters wih `show_data` function
+4. Check the initial warp parameters wih `show_data` function
 
 ```python
 show_data(
     image=image,
-    template=templ,
-    mat_affine=params['p_init']
+    template=template,
+    coords_transform=transform
 )
 ```
 
@@ -108,39 +126,83 @@ And you will see how the parameters warp image over template
 
 ![image](./docs/images/example_init_p.png)
 
-6. Run the method on our images.
+5. Run the method on our images.
 
 ```python
 ps = method(
     image=image,
-    template=templ,
+    template=template,
+    coord_transform=transform,
     **params
 )
 ```
 
-Here `ps` is a List of estimated parameters (for [affine](https://docs.opencv.org/3.4/d4/d61/tutorial_warp_affine.html) image transformation) on each iteration.
+Here `ps` is a List of estimated parameters on each iteration.
 
 7. To look at the process of alignmet we provide function that write the results of alignment on each step.
 
 ```python
 save_aligment_progress(
-    f'./media/progress_example.gif',
+    f'../docs/images/translation_alignment_example.gif',
     image=image,
-    template=templ,
-    mat_affine_list=ps,
+    template=template,
+    coords_transform=transform,
+    ps=ps,
     duration=100,
 )
 ```
-![gif_resuls](./docs/images/progress_example.gif)
+![gif_resuls](./docs/images/translation_alignment_example.gif)
 
 8. To look only at result we provide the function `show_data`.
 
 ```python
+transform.p = ps[-1]
+
 show_data(
     image=image,
-    template=templ,
-    mat_affine=ps[-1]
+    template=template,
+    coords_transform=transform
 )
 ```
 
 ![image](./docs/images/output_example_result.png)
+
+
+### Configure Custom Transformation
+
+After you install the package, let's see the example of usage for general case of Image Transformation. For now you may use prepared [warp Affine](./notebooks/TranslationExample.ipynb) and basic [warp Translation](./notebooks/TranslationExample.ipynb).
+
+1. First we need to configure our Transformation. To do that we provide class `BaseTransform`. You need to provide implementation for `jacobian()` and `apply_transformation_to_coordinates()`.
+
+```python
+from dense_image_aligment.transformations import BaseTransform
+import numpy as np
+
+
+class CustomTransform(BaseTransform):
+
+    def jacobian(self, x: np.array, p_c: np.ndarray) -> np.ndarray:
+        """_summary_
+
+        Args:
+            x (ndarray): N x 2 matrix of coordinates
+            p_c (ndarray): n vector of parameters
+
+        Returns:
+            ndarray: N x 2 x n
+        """
+
+        # you code here #
+
+    def apply_transformation_to_coordinates(self, coords: np.ndarray) -> np.ndarray:
+        """apply transformation to image coordinates
+
+        Args:
+            coords (np.ndarray): N x 2 matrix (x, y coordinates)
+
+        Returns:
+            np.ndarray: transformed coordinates N x 2 matrix
+        """
+        # you code here #
+
+```

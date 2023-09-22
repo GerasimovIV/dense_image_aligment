@@ -3,7 +3,7 @@ from typing import Optional
 import numpy as np
 from numpy import ndarray
 
-from .base_transformation import BaseTransform
+from .basic_transformation import BaseTransform
 
 
 class AffineTransformation(BaseTransform):

@@ -2,7 +2,7 @@ from typing import Tuple
 
 import numpy as np
 
-from .transformations.base_transformation import BaseTransform
+from .transformations.basic_transformation import BaseTransform
 
 
 def compute_image_grad(image: np.ndarray) -> np.ndarray:

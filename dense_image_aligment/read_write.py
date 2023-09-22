@@ -6,7 +6,7 @@ import numpy as np
 from PIL import Image
 from tqdm import tqdm
 
-from .transformations.base_transformation import BaseTransform
+from .transformations.basic_transformation import BaseTransform
 
 
 def read_as_grayscale(p: str) -> np.ndarray:
