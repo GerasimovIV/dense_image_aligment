@@ -94,7 +94,7 @@ def show_data(
     h, w = image.shape
 
     a = np.array([[0, 0, w, w],
-                  [0, h, h, 0]]).T
+                  [0, h, h, 0]], dtype=np.float32).T
 
     b = coords_transform.apply_transformation_to_coordinates(
         coords=a
@@ -158,7 +158,7 @@ def save_aligment_progress(
             axis=0)
 
         a = np.array([[0, 0, w, w],
-                  [0, h, h, 0]]).T
+                  [0, h, h, 0]], dtype=np.float32).T
 
         b = coords_transform.apply_transformation_to_coordinates(
             coords=a

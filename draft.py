@@ -1,3 +1,4 @@
+import matplotlib.pyplot as plt
 import numpy as np
 
 from dense_image_aligment import (
@@ -7,32 +8,33 @@ from dense_image_aligment import (
     save_aligment_progress,
     show_data,
 )
-from dense_image_aligment.transformations.affine import AffineTransformation
+from dense_image_aligment.transformations.translation import TranslationTransformation
 
-image = read_as_grayscale('./media/kanade.jpg')
-templ = read_as_grayscale('./media/kanade_image.jpg')
+
+def create_simple_gauss(mu, sigma, shape):
+    x = np.linspace(0, 1, shape[0])
+    y = np.linspace(0, 1, shape[1])
+
+    xx, yy = np.meshgrid(x, y, indexing='xy')
+
+    z = np.exp(-( (xx - mu[0])**2 +  (yy - mu[1])**2) / (2 * sigma**2)) / (sigma * np.sqrt(2 * np.pi))
+    return z
+
+
+template = create_simple_gauss([0.5, 0.5], 0.1, [100, 100])
+image = create_simple_gauss([0.3, 0.3], 0.1, [100, 100])
 
 
 method, params = image_aligment_method(key='forward_additive')
 params['alpha'] = 1.0
 params['max_iterations'] = 100
-params['p_init'] = np.array([[  1.02040816,  -0.10204082, -33.67346939],
-       [ -0.20408163,   1.02040816, -63.26530612]]).reshape(-1)
+params['p_init'] = np.array([1., 1.])
 
-affine_transform = AffineTransformation(params['p_init'].reshape(-1))
+affine_transform = TranslationTransformation(params['p_init'])
 
-
-ps = method(
-    image=image,
-    template=templ,
-    coord_transform=affine_transform,
-    **params
-)
-
-affine_transform.p = ps[-1]
 
 show_data(
     image=image,
-    template=templ,
+    template=template,
     coords_transform=affine_transform
 )
