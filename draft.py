@@ -30,11 +30,11 @@ params['alpha'] = 1.0
 params['max_iterations'] = 100
 params['p_init'] = np.array([1., 1.])
 
-affine_transform = TranslationTransformation(params['p_init'])
+transform = TranslationTransformation(params['p_init'])
 
 
-show_data(
-    image=image,
-    template=template,
-    coords_transform=affine_transform
-)
+# show_data(
+#     image=image,
+#     template=template,
+#     coords_transform=transform
+# )

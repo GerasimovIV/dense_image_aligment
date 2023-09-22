@@ -98,5 +98,7 @@ def compute_H(
         np.ndarray: matrix n x n where n is the number of warp parameters
     """
 
-    H = np.einsum('ij,ik->ijk', J, J).sum(0)
+    # H = np.einsum('ij,ik->ijk', J, J).sum(0)
+    H = np.einsum('ij,ij->i', J, J).sum(0)
+
     return H
