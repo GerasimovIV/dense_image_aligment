@@ -19,7 +19,7 @@ dense_image_alignment is a Python library for dense image alignment. For more de
 
 ## Features
 
-- This implementation may work with any type of warp fucntions, you just need to provide jacobian and exact transformation. How to configure your custom transformation look [here](#configure-custom-transformation).
+- 🪄 Configure your [CUSTOM](#configure-custom-transformation) warp fucntion.
 - Contains implementations for the first order methods:
     - ✅ Forward Additive
     - ❌ Forward Compositional (not implemented yet)
