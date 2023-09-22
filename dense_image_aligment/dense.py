@@ -25,7 +25,7 @@ def forward_additive(
         template (numpy.ndarray):
             A grayscale image of shape (height, width).
         image (numpy.ndarray):
-            A template image (height_t, width_t).
+            A grayscale image of shape (height, width).
         coord_transform (BaseTransform):
             image warp
         p_init (Optional[numpy.ndarray]):
@@ -102,9 +102,7 @@ def image_aligment_method(key: str) -> Tuple[Callable, Dict[str, Any]]:
     ----------
     key : str
         name of the method, one of:
-            forward_compositional
             forward_additive
-            inverse_compositional
 
     Returns
     -------

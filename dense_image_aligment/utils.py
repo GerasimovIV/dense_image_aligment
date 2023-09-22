@@ -15,21 +15,41 @@ def compute_image_grad(image: np.ndarray) -> np.ndarray:
         np.ndarray: matrix with shape N x 2 where N is a number of pixels in image
     """
 
-    gigx = np.zeros_like(image, dtype=image.dtype)
-    gigx[:, 1:-1] = (image[:, 2:] - image[:, :-2]) / 2
-    gigy = np.zeros_like(image, dtype=image.dtype)
-    gigy[1:-1] = (image[2:] - image[:-2]) / 2
+    dI_dx = np.zeros_like(image, dtype=image.dtype)
+    dI_dy = np.zeros_like(image, dtype=image.dtype)
+
+    dI_dx[:, 1:-1] = (image[:, 2:] - image[:, :-2]) / 2
+    dI_dx[:, 0] = (image[:, 1] - image[:, 0])
+    dI_dx[:, -1] = (image[:, -1] - image[:, -2])
+
+    dI_dy[1:-1, :] = (image[2:, :] - image[:-2, :]) / 2
+    dI_dx[0, :] = (image[1, :] - image[0, :])
+    dI_dx[-1, :] = (image[-1, :] - image[-2, :])
+
 
     nabla_I = np.vstack(
         [
-            gigx.reshape(-1),
-            gigy.reshape(-1),
+            dI_dx.reshape(-1),
+            dI_dy.reshape(-1),
         ]
     ).T
 
-    x_coord = np.arange(image.shape[1], dtype=np.float32)
-    y_coord = np.arange(image.shape[0], dtype=np.float32)
-    x_coord, y_coord = np.meshgrid(x_coord, y_coord, indexing='xy')
+    x_coord = np.repeat(
+        np.arange(
+            image.shape[1],
+            dtype=image.dtype
+        )[None, ...],
+        image.shape[0],
+        axis=0
+    )
+    y_coord = np.repeat(
+        np.arange(
+            image.shape[0],
+            dtype=image.dtype
+        )[..., None],
+        image.shape[1],
+        axis=1
+    )
 
     image_pixels_coordinates = np.vstack(
         [
