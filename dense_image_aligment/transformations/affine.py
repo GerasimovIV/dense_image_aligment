@@ -31,19 +31,18 @@ class AffineTransformation(BaseTransform):
         jacobian[:, 1, 4] = x[:, 1]
         jacobian[:, 1, 5] = 1.
 
-
         return jacobian
 
     def apply_transformation_to_coordinates(self, coords: ndarray) -> ndarray:
-        coords_extended = np.hstack(
+        coords_extended = np.copy(np.hstack(
             [
                 coords,
                 np.ones((coords.shape[0], 1) , dtype=coords.dtype)
             ]
-        )
+        ))
 
         warp_matrix = np.zeros((2, 3))
         warp_matrix[0, :] = self.p[:3]
         warp_matrix[1, :] = self.p[3:]
 
-        return coords_extended @ warp_matrix.T
+        return (warp_matrix @ coords_extended.T).T
