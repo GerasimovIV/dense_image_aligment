@@ -70,18 +70,16 @@ from dense_image_aligment.transformations import TranslationTransformation
 2. Prepare the Input and Template images.
 
 ```python
-def create_simple_gauss(mu, sigma, shape):
-    x = np.linspace(0, 1, shape[0])
-    y = np.linspace(0, 1, shape[1])
+def create_simple_L(shape):
+    mask = np.zeros(shape, dtype=np.float32)
+    mask[shape[0] // 5 : shape[0] * 4 // 5, shape[1] // 5 : shape[0] * 2 // 5] = 1.
+    mask[shape[0] // 2 : shape[0] * 4 // 5, shape[1] // 5 : shape[0] * 4 // 5] = 1.
 
-    xx, yy = np.meshgrid(x, y, indexing='xy')
-
-    z = np.exp(-( (xx - mu[0])**2 / (sigma[0]**2) +  (yy - mu[1])**2 / (sigma[1]**2)) / 2) / (np.sqrt(sigma[0]**2 + sigma[1]**2) * np.sqrt(2 * np.pi))
-    return z
+    return mask
 
 
-template = create_simple_gauss([0.5, 0.5], [0.1, 0.1], [100, 100])
-image = create_simple_gauss([0.5, 0.5], [0.1, 0.1], [100, 100])
+template = create_simple_L([100, 90])
+image = create_simple_L([100, 90])
 
 ```
 
@@ -91,7 +89,7 @@ image = create_simple_gauss([0.5, 0.5], [0.1, 0.1], [100, 100])
 method, params = image_aligment_method(key='forward_additive')
 params['alpha'] = 1.0
 params['max_iterations'] = 100
-params['p_init'] = np.array([30., 20.])
+params['p_init'] = np.array([20., 10.])
 params['convergence_threshold'] = 1e-8
 
 transform = TranslationTransformation(params['p_init'])
@@ -100,7 +98,7 @@ transform = TranslationTransformation(params['p_init'])
 The function image_aligment_method return reference for choisen method function and the set of its default hyperparameters. In that case we have the set of params:
 
 - p_init:
-$`\begin{bmatrix} 30. \\ 20 \end{bmatrix}`$
+$`\begin{bmatrix} 20. \\ 10 \end{bmatrix}`$
 - max_iterations: 100
 - convergence_threshold: 1e-8
 - verbose: True
