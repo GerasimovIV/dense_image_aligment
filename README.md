@@ -12,7 +12,7 @@ dense_image_alignment is a Python library for dense image alignment. For more de
     <p align="center">
         <img src="./docs/images/translation_alignment_example.gif" alt="animated" width="200" />
         <img src="./docs/images/affine_alignment_example.gif" alt="animated" width="200" />
-        <img src="./docs/images/progress_example.gif" alt="animated" width="200" />
+        <img src="./docs/images/homography_alignment_example.gif" alt="animated" width="200" />
     </p>
 </div>
 
@@ -24,6 +24,12 @@ dense_image_alignment is a Python library for dense image alignment. For more de
     - ✅ Forward Additive
     - ❌ Forward Compositional (not implemented yet)
     - ❌ Inverse Compositional (not implemented yet)
+
+- Contains implementations for coordinate transformations:
+    - ✅ Translation
+    - ✅ Affine
+    - ✅ Homography
+    - ❌ Reprojection
 
 ## Installation
 

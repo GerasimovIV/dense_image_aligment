@@ -21,7 +21,7 @@ class AffineTransformation(BaseTransform):
 
         N = x.shape[0]
 
-        jacobian = np.zeros((N, 2, self.n))
+        jacobian = np.zeros((N, 2, self.n), dtype=np.float32)
 
         jacobian[:, 0, 0] = x[:, 0]
         jacobian[:, 0, 1] = x[:, 1]
