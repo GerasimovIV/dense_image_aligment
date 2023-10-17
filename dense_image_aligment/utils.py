@@ -41,7 +41,8 @@ def compute_image_grad(image: np.ndarray) -> np.ndarray:
         )[None, ...],
         image.shape[0],
         axis=0
-    )
+    ) - float(image.shape[1]) / 2
+
     y_coord = np.repeat(
         np.arange(
             image.shape[0],
@@ -49,7 +50,7 @@ def compute_image_grad(image: np.ndarray) -> np.ndarray:
         )[..., None],
         image.shape[1],
         axis=1
-    )
+    ) - float(image.shape[0]) / 2
 
     image_pixels_coordinates = np.vstack(
         [

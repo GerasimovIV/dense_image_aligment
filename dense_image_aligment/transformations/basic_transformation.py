@@ -36,8 +36,8 @@ class BaseTransform(object):
 
         assert len(image.shape) == 2, f'image shape = {image.shape}'
 
-        x_coord = np.arange(image.shape[1], dtype=np.float32)
-        y_coord = np.arange(image.shape[0], dtype=np.float32)
+        x_coord = np.arange(image.shape[1], dtype=np.float32) - float(image.shape[1]) / 2
+        y_coord = np.arange(image.shape[0], dtype=np.float32) - float(image.shape[0]) / 2
         x_coord, y_coord = np.meshgrid(x_coord, y_coord, indexing='xy')
 
         image_pixels_coordinates = np.vstack(
@@ -59,8 +59,8 @@ class BaseTransform(object):
             fill_value=0.
         )
 
-        x_coord = np.arange(shape[1], dtype=np.float32)
-        y_coord = np.arange(shape[0], dtype=np.float32)
+        x_coord = np.arange(shape[1], dtype=np.float32) - float(shape[1]) / 2
+        y_coord = np.arange(shape[0], dtype=np.float32) - float(shape[0]) / 2
 
         x_coord, y_coord = np.meshgrid(x_coord, y_coord, indexing='xy')  # 2D grid for interpolation
 
@@ -93,3 +93,9 @@ class BaseTransform(object):
             BaseTransform: _description_
         """
         raise NotImplementedError
+
+    def apply_inverse_transformation_to_coordinates(self, coords: np.ndarray) -> np.ndarray:
+        raise NotImplementedError
+
+    def __mul__(self, coords: np.ndarray) -> np.ndarray:
+        return self.apply_transformation_to_coordinates(coords=coords)

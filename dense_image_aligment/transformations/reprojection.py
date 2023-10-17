@@ -6,6 +6,39 @@ from numpy import ndarray
 from .basic_transformation import BaseTransform
 
 
+class ProjectionTransformation(BaseTransform):
+    n: int = 9
+    def __init__(self, p_init: Optional[ndarray] = None) -> None:
+        if p_init is not None:
+            assert p_init.shape == (self.n,), f'Wrong parameters shape, given: {p_init.shape}'
+            self.p = p_init
+
+    def apply_inverse_transformation_to_coordinates(self, coords: ndarray, depths: ndarray) -> ndarray:
+        """_summary_
+
+        Args:
+            coords (ndarray): n x 2, points coordinates in image coordinates system
+            depths (ndarray): n, depths for each point (along point ray, not exactly z coordinate)
+
+        Returns:
+            ndarray: n x 3, X coordinates in scene Space
+        """
+        raise NotImplementedError
+
+
+    def apply_transformation_to_coordinates(self, coords: ndarray) -> ndarray:
+        """_summary_
+
+        Args:
+            coords (ndarray): n x 3, X coordinates in scene Space
+
+        Returns:
+            ndarray: n x 2, points coordinates in image coordinates system
+        """
+
+
+
+
 class ReprojectionTransformation(BaseTransform):
     # n: int = 8
     # p = np.eye(3, 3, dtype=np.float32).reshape(-1)[:8]
