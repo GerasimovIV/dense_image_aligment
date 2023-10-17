@@ -4,14 +4,17 @@ import numpy as np
 from numpy import ndarray
 
 from .basic_transformation import BaseTransform
+from .coords_utils import hom_coords
 
 
 class ProjectionTransformation(BaseTransform):
     n: int = 9
+    p = np.eye(3, 3, dtype=np.float32).reshape(-1)
     def __init__(self, p_init: Optional[ndarray] = None) -> None:
         if p_init is not None:
             assert p_init.shape == (self.n,), f'Wrong parameters shape, given: {p_init.shape}'
             self.p = p_init
+
 
     def apply_inverse_transformation_to_coordinates(self, coords: ndarray, depths: ndarray) -> ndarray:
         """_summary_
@@ -35,6 +38,16 @@ class ProjectionTransformation(BaseTransform):
         Returns:
             ndarray: n x 2, points coordinates in image coordinates system
         """
+        projection_matrix = self.p.reshape(3, 3)
+
+        coords_new = np.copy(coords)
+        coords_new = (projection_matrix @ coords_new.T).T
+        coords_new[:, 0] /= coords_new[:, 2]
+        coords_new[:, 1] /= coords_new[:, 2]
+        coords_new = coords_new[:, :2]
+
+        return coords_new
+
 
 
 

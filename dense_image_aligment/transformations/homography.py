@@ -4,6 +4,7 @@ import numpy as np
 from numpy import ndarray
 
 from .basic_transformation import BaseTransform
+from .coords_utils import hom_coords
 
 
 class HomographyTransformation(BaseTransform):
@@ -17,12 +18,7 @@ class HomographyTransformation(BaseTransform):
             self.p = p_init
 
     def transformed_hom_coords(self, coords: ndarray, p_c: Optional[np.ndarray] = None) -> np.ndarray:
-        coords_extended = np.copy(np.hstack(
-            [
-                coords,
-                np.ones((coords.shape[0], 1) , dtype=coords.dtype)
-            ]
-        ))
+        coords_extended = hom_coords(coords)
 
         p = p_c if p_c is not None else self.p
 
