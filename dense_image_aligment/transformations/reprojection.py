@@ -4,7 +4,7 @@ import numpy as np
 from numpy import ndarray
 
 from .basic_transformation import BaseTransform
-from .coords_utils import hom_coords
+from .coords_utils import hom_coords, rotation_matrix
 
 
 class ProjectionTransformation(BaseTransform):
@@ -15,25 +15,11 @@ class ProjectionTransformation(BaseTransform):
             assert p_init.shape == (self.n,), f'Wrong parameters shape, given: {p_init.shape}'
             self.p = p_init
 
-
-    def apply_inverse_transformation_to_coordinates(self, coords: ndarray, depths: ndarray) -> ndarray:
-        """_summary_
-
-        Args:
-            coords (ndarray): n x 2, points coordinates in image coordinates system
-            depths (ndarray): n, depths for each point (along point ray, not exactly z coordinate)
-
-        Returns:
-            ndarray: n x 3, X coordinates in scene Space
-        """
-        raise NotImplementedError
-
-
     def apply_transformation_to_coordinates(self, coords: ndarray) -> ndarray:
         """_summary_
 
         Args:
-            coords (ndarray): n x 3, X coordinates in scene Space
+            coords (ndarray): n x 3, X coordinates in camera Space
 
         Returns:
             ndarray: n x 2, points coordinates in image coordinates system
@@ -49,71 +35,152 @@ class ProjectionTransformation(BaseTransform):
         return coords_new
 
 
+class ProjectionPseudoInvTransformation(BaseTransform):
+    n: int = 9
+    p = np.eye(3, 3, dtype=np.float32).reshape(-1)
+    def __init__(self, p_init: Optional[ndarray] = None) -> None:
+        if p_init is not None:
+            assert p_init.shape == (self.n,), f'Wrong parameters shape, given: {p_init.shape}'
+            self.p = p_init
 
+    def apply_transformation_to_coordinates(self, coords: ndarray, depth: ndarray) -> ndarray:
+        """_summary_
+
+        Args:
+            coords (ndarray): n x 2,  coordinates in image coord system
+            depth (ndarray): n, depth along ray for each pixel
+
+        Returns:
+            ndarray: n x 3, coordinates in camera coord system
+        """
+        projection_matrix = self.p.reshape(3, 3)
+        projection_matrix_inv = np.linalg.inv(projection_matrix)
+
+
+        coords_new = np.copy(coords)
+        coords_new = hom_coords(coords_new)
+
+        coords_new = coords_new * depth[..., None]
+
+        coords_new = (projection_matrix_inv @ coords_new.T).T
+        return coords_new
+
+
+class RT_Transformation(BaseTransform):
+    n: int = 6
+    p: np.ndarray = np.zeros(6, dtype=np.float32)
+
+    def apply_transformation_to_coordinates(self, coords: ndarray) -> ndarray:
+        """_summary_
+
+        Args:
+            coords (ndarray): n x 3,  coordinates in camera coord system
+
+        Returns:
+            ndarray: n x 3, coordinates in camera coord system
+        """
+        R = rotation_matrix(self.p[:3])
+
+        RT_matrix = np.zeros((4, 4), dtype=np.float32)
+        RT_matrix[3, 3] = 1.
+        RT_matrix[:3, :3] = R
+        RT_matrix[:3, 3] = self.p[3:]
+
+
+        coords_new = np.copy(coords)
+        coords_new = hom_coords(coords_new)
+
+        coords_new = (RT_matrix @ coords_new.T).T
+        coords_new = coords_new[:, :3]
+
+        return coords_new
 
 
 class ReprojectionTransformation(BaseTransform):
-    # n: int = 8
-    # p = np.eye(3, 3, dtype=np.float32).reshape(-1)[:8]
+    n: 6
+    p: np.ndarray = np.zeros(6, dtype=np.float32)
 
-    def __init__(self, p_init: Optional[ndarray] = None) -> None:
-        raise NotImplementedError
-        # if p_init is not None:
-        #     assert p_init.shape == (self.n,), f'Wrong parameters shape, given: {p_init.shape}'
-        #     self.p = p_init
+    def __init__(self, p_init: np.ndarray, intrinsic: np.ndarray) -> None:
+        super().__init__(p_init)
 
-    def transformed_hom_coords(self, coords: ndarray, p_c: Optional[np.ndarray] = None) -> np.ndarray:
-        raise NotImplementedError
-
-        # coords_extended = np.copy(np.hstack(
-        #     [
-        #         coords,
-        #         np.ones((coords.shape[0], 1) , dtype=coords.dtype)
-        #     ]
-        # ))
-
-        # p = p_c if p_c is not None else self.p
-
-        # warp_matrix = np.ones(9)
-        # warp_matrix[:8] = p
-        # warp_matrix = warp_matrix.reshape(3, 3)
-
-        # coords_new = (warp_matrix @ coords_extended.T).T # n x 3
-        # return coords_new
+        self.camera_projection = ProjectionTransformation(intrinsic)
+        self.camera_projection_inv = ProjectionPseudoInvTransformation(intrinsic)
+        self.RT = RT_Transformation(p_init=p_init)
 
 
-    def jacobian(self, x: ndarray, p_c: ndarray) -> ndarray:
-        raise NotImplementedError
+    def apply_transformation_to_coordinates(self, coords: np.ndarray, depth: Optional[np.array] = None) -> np.ndarray:
+        # apply inverse projection
 
-        # N = x.shape[0]
+        X = self.camera_projection_inv.apply_transformation_to_coordinates(coords=coords, depth=depth)
+        X = self.RT.apply_transformation_to_coordinates(coords=X)
+        x = self.camera_projection.apply_transformation_to_coordinates(coords=X)
 
-        # jacobian = np.zeros((N, 2, self.n), dtype=np.float32)
+        return x
 
-        # trasformed_coords = self.transformed_hom_coords(x, p_c)
 
-        # scale = trasformed_coords[:, 2]
 
-        # jacobian[:, 0, 0] = x[:, 0]
-        # jacobian[:, 0, 1] = x[:, 1]
-        # jacobian[:, 0, 2] = 1.
+# class ReprojectionTransformation(BaseTransform):
+#     # n: int = 8
+#     # p = np.eye(3, 3, dtype=np.float32).reshape(-1)[:8]
 
-        # jacobian[:, 0, 6] = - trasformed_coords[:, 0] * x[:, 0] / (scale) ** 2
-        # jacobian[:, 0, 7] = - trasformed_coords[:, 0] * x[:, 1] / (scale) ** 2
+#     def __init__(self, p_init: Optional[ndarray] = None) -> None:
+#         raise NotImplementedError
+#         # if p_init is not None:
+#         #     assert p_init.shape == (self.n,), f'Wrong parameters shape, given: {p_init.shape}'
+#         #     self.p = p_init
 
-        # jacobian[:, 1, 3] = x[:, 0]
-        # jacobian[:, 1, 4] = x[:, 1]
-        # jacobian[:, 1, 5] = 1.
+#     def transformed_hom_coords(self, coords: ndarray, p_c: Optional[np.ndarray] = None) -> np.ndarray:
+#         raise NotImplementedError
 
-        # jacobian[:, 1, 6] = - trasformed_coords[:, 1] * x[:, 0] / (scale) ** 2
-        # jacobian[:, 1, 7] = - trasformed_coords[:, 1] * x[:, 1] / (scale) ** 2
+#         # coords_extended = np.copy(np.hstack(
+#         #     [
+#         #         coords,
+#         #         np.ones((coords.shape[0], 1) , dtype=coords.dtype)
+#         #     ]
+#         # ))
 
-        # return jacobian
+#         # p = p_c if p_c is not None else self.p
 
-    def apply_transformation_to_coordinates(self, coords: ndarray) -> ndarray:
-        raise NotImplementedError
+#         # warp_matrix = np.ones(9)
+#         # warp_matrix[:8] = p
+#         # warp_matrix = warp_matrix.reshape(3, 3)
 
-        # coords_new = self.transformed_hom_coords(coords)
-        # coords_new[:, 0] /= coords_new[:, 2]
-        # coords_new[:, 1] /= coords_new[:, 2]
+#         # coords_new = (warp_matrix @ coords_extended.T).T # n x 3
+#         # return coords_new
 
-        # return coords_new[:, :2]
+
+#     def jacobian(self, x: ndarray, p_c: ndarray) -> ndarray:
+#         raise NotImplementedError
+
+#         # N = x.shape[0]
+
+#         # jacobian = np.zeros((N, 2, self.n), dtype=np.float32)
+
+#         # trasformed_coords = self.transformed_hom_coords(x, p_c)
+
+#         # scale = trasformed_coords[:, 2]
+
+#         # jacobian[:, 0, 0] = x[:, 0]
+#         # jacobian[:, 0, 1] = x[:, 1]
+#         # jacobian[:, 0, 2] = 1.
+
+#         # jacobian[:, 0, 6] = - trasformed_coords[:, 0] * x[:, 0] / (scale) ** 2
+#         # jacobian[:, 0, 7] = - trasformed_coords[:, 0] * x[:, 1] / (scale) ** 2
+
+#         # jacobian[:, 1, 3] = x[:, 0]
+#         # jacobian[:, 1, 4] = x[:, 1]
+#         # jacobian[:, 1, 5] = 1.
+
+#         # jacobian[:, 1, 6] = - trasformed_coords[:, 1] * x[:, 0] / (scale) ** 2
+#         # jacobian[:, 1, 7] = - trasformed_coords[:, 1] * x[:, 1] / (scale) ** 2
+
+#         # return jacobian
+
+#     def apply_transformation_to_coordinates(self, coords: ndarray) -> ndarray:
+#         raise NotImplementedError
+
+#         # coords_new = self.transformed_hom_coords(coords)
+#         # coords_new[:, 0] /= coords_new[:, 2]
+#         # coords_new[:, 1] /= coords_new[:, 2]
+
+#         # return coords_new[:, :2]

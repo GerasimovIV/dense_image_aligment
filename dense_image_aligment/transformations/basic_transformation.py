@@ -1,11 +1,12 @@
-from typing import Tuple
+from typing import Optional, Tuple
 
 import numpy as np
 from scipy.interpolate import LinearNDInterpolator
 
 
 class BaseTransform(object):
-
+    n: int
+    p: np.ndarray
     def __init__(self, p_init: np.ndarray) -> None:
         self.p = p_init
 
@@ -34,7 +35,7 @@ class BaseTransform(object):
             np.array: _description_
         """
 
-        assert len(image.shape) == 2, f'image shape = {image.shape}'
+        assert len(image.shape) == 2 or len(image.shape) == 3, f'image shape = {image.shape}'
 
         x_coord = np.arange(image.shape[1], dtype=np.float32) - float(image.shape[1]) / 2
         y_coord = np.arange(image.shape[0], dtype=np.float32) - float(image.shape[0]) / 2
@@ -47,11 +48,22 @@ class BaseTransform(object):
             ]
         ).T # n x 2
 
-        transformed_coordinates = self.apply_transformation_to_coordinates(
-            image_pixels_coordinates
-        )
+        if len(image.shape) == 2:
+            transformed_coordinates = self.apply_transformation_to_coordinates(
+                image_pixels_coordinates
+            )
+        elif len(image.shape) == 3:
+            transformed_coordinates = self.apply_transformation_to_coordinates(
+                image_pixels_coordinates,
+                depth=image[:, :, 1].reshape(-1)
+            )
 
-        image_values = image.astype(np.float32).reshape(-1)
+        if len(image.shape) == 2:
+            image_values = image.astype(np.float32).reshape(-1)
+        elif len(image.shape) == 3:
+            image_values = image[:, :, 0].astype(np.float32).reshape(-1)
+        else:
+            raise NotImplementedError
 
         inter_func = LinearNDInterpolator(
             points=transformed_coordinates,
@@ -72,7 +84,8 @@ class BaseTransform(object):
         return transformed_image_values.reshape(*shape)
 
 
-    def apply_transformation_to_coordinates(self, coords: np.ndarray) -> np.ndarray:
+
+    def apply_transformation_to_coordinates(self, coords: np.ndarray, depth: Optional[np.array] = None) -> np.ndarray:
         """apply transformation to image coordinates
 
         Args:
