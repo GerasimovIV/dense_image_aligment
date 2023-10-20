@@ -1,7 +1,8 @@
-from typing import Optional
+from typing import Optional, Tuple
 
 import numpy as np
 from numpy import ndarray
+from scipy.interpolate import LinearNDInterpolator
 
 from .basic_transformation import BaseTransform
 from .coords_utils import hom_coords, rotation_matrix
@@ -15,7 +16,7 @@ class ProjectionTransformation(BaseTransform):
             assert p_init.shape == (self.n,), f'Wrong parameters shape, given: {p_init.shape}'
             self.p = p_init
 
-    def apply_transformation_to_coordinates(self, coords: ndarray) -> ndarray:
+    def apply_transformation_to_coordinates(self, coords: ndarray) -> Tuple[ndarray]:
         """_summary_
 
         Args:
@@ -30,6 +31,15 @@ class ProjectionTransformation(BaseTransform):
         coords_new = (projection_matrix @ coords_new.T).T
         coords_new[:, 0] /= coords_new[:, 2]
         coords_new[:, 1] /= coords_new[:, 2]
+
+        # mask_visibility = np.zeros(coords_new.shape[0], dtype=np.bool_)
+        # indexes = np.copy(coords_new[:, :2]).round().astype(int)
+        # indexes[:, 0] += indexes[:, 0].min()
+        # indexes[:, 1] += indexes[:, 1].min()
+
+        # mask = np.zeros((indexes[:, 0].max(), indexes[:, 1].max()), dtype=np.bool_)
+        # mask
+
         coords_new = coords_new[:, :2]
 
         return coords_new
@@ -117,70 +127,68 @@ class ReprojectionTransformation(BaseTransform):
 
         return x
 
+    def apply_transformation(self, image: np.ndarray, shape: Tuple[int, int]) -> np.ndarray:
+        """return transformed image
 
+        Args:
+            image (np.ndarray): _description_
 
-# class ReprojectionTransformation(BaseTransform):
-#     # n: int = 8
-#     # p = np.eye(3, 3, dtype=np.float32).reshape(-1)[:8]
+        Raises:
+            NotImplementedError: _description_
 
-#     def __init__(self, p_init: Optional[ndarray] = None) -> None:
-#         raise NotImplementedError
-#         # if p_init is not None:
-#         #     assert p_init.shape == (self.n,), f'Wrong parameters shape, given: {p_init.shape}'
-#         #     self.p = p_init
+        Returns:
+            np.array: _description_
+        """
 
-#     def transformed_hom_coords(self, coords: ndarray, p_c: Optional[np.ndarray] = None) -> np.ndarray:
-#         raise NotImplementedError
+        assert len(image.shape) == 3 or len(image.shape) == 3, f'image shape = {image.shape}'
 
-#         # coords_extended = np.copy(np.hstack(
-#         #     [
-#         #         coords,
-#         #         np.ones((coords.shape[0], 1) , dtype=coords.dtype)
-#         #     ]
-#         # ))
+        x_coord = np.arange(image.shape[1], dtype=np.float32) - float(image.shape[1]) / 2
+        y_coord = np.arange(image.shape[0], dtype=np.float32) - float(image.shape[0]) / 2
+        x_coord, y_coord = np.meshgrid(x_coord, y_coord, indexing='xy')
 
-#         # p = p_c if p_c is not None else self.p
+        image_pixels_coordinates = np.vstack(
+            [
+                x_coord.reshape(-1),
+                y_coord.reshape(-1)
+            ]
+        ).T # n x 2
 
-#         # warp_matrix = np.ones(9)
-#         # warp_matrix[:8] = p
-#         # warp_matrix = warp_matrix.reshape(3, 3)
+        transformed_coordinates = self.apply_transformation_to_coordinates(
+            image_pixels_coordinates,
+            depth=image[:, :, 1].reshape(-1)
+        )
 
-#         # coords_new = (warp_matrix @ coords_extended.T).T # n x 3
-#         # return coords_new
+        image_values = image[:, :, 0].astype(np.float32).reshape(-1)
 
+        inter_func = LinearNDInterpolator(
+            points=transformed_coordinates,
+            values=image_values,
+            fill_value=0.
+        )
 
-#     def jacobian(self, x: ndarray, p_c: ndarray) -> ndarray:
-#         raise NotImplementedError
+        x_coord = np.arange(shape[1], dtype=np.float32) - float(shape[1]) / 2
+        y_coord = np.arange(shape[0], dtype=np.float32) - float(shape[0]) / 2
 
-#         # N = x.shape[0]
+        x_coord, y_coord = np.meshgrid(x_coord, y_coord, indexing='xy')  # 2D grid for interpolation
 
-#         # jacobian = np.zeros((N, 2, self.n), dtype=np.float32)
+        transformed_image_values = inter_func(
+            x_coord,
+            y_coord,
+        )
 
-#         # trasformed_coords = self.transformed_hom_coords(x, p_c)
+        indexes = np.copy(transformed_coordinates)
+        indexes[:, 0] += float(image.shape[1]) / 2
+        indexes[:, 1] += float(image.shape[0]) / 2
+        indexes = indexes.round().astype(int)
+        indexes = indexes[indexes[:, 0] >= 0]
+        indexes = indexes[indexes[:, 0] < shape[1]]
+        indexes = indexes[indexes[:, 1] >= 0]
+        indexes = indexes[indexes[:, 1] < shape[0]]
 
-#         # scale = trasformed_coords[:, 2]
+        values_mask = np.zeros(shape, dtype=np.bool_)
+        values_mask[indexes[:, 1], indexes[:, 0]] = 1
 
-#         # jacobian[:, 0, 0] = x[:, 0]
-#         # jacobian[:, 0, 1] = x[:, 1]
-#         # jacobian[:, 0, 2] = 1.
+        transformed_image = np.zeros(shape, dtype=transformed_image_values.dtype)
+        transformed_image[values_mask] = transformed_image_values.reshape(*shape)[values_mask]
 
-#         # jacobian[:, 0, 6] = - trasformed_coords[:, 0] * x[:, 0] / (scale) ** 2
-#         # jacobian[:, 0, 7] = - trasformed_coords[:, 0] * x[:, 1] / (scale) ** 2
-
-#         # jacobian[:, 1, 3] = x[:, 0]
-#         # jacobian[:, 1, 4] = x[:, 1]
-#         # jacobian[:, 1, 5] = 1.
-
-#         # jacobian[:, 1, 6] = - trasformed_coords[:, 1] * x[:, 0] / (scale) ** 2
-#         # jacobian[:, 1, 7] = - trasformed_coords[:, 1] * x[:, 1] / (scale) ** 2
-
-#         # return jacobian
-
-#     def apply_transformation_to_coordinates(self, coords: ndarray) -> ndarray:
-#         raise NotImplementedError
-
-#         # coords_new = self.transformed_hom_coords(coords)
-#         # coords_new[:, 0] /= coords_new[:, 2]
-#         # coords_new[:, 1] /= coords_new[:, 2]
-
-#         # return coords_new[:, :2]
+        return transformed_image

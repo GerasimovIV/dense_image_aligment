@@ -1,7 +1,7 @@
 from typing import Optional, Tuple
 
 import numpy as np
-from scipy.interpolate import LinearNDInterpolator
+from scipy.interpolate import LinearNDInterpolator, NearestNDInterpolator
 
 
 class BaseTransform(object):
@@ -58,12 +58,19 @@ class BaseTransform(object):
                 depth=image[:, :, 1].reshape(-1)
             )
 
+        if isinstance(transformed_coordinates, Tuple):
+            transformed_coordinates, inter_mask = transformed_coordinates
+            transformed_coordinates = transformed_coordinates[inter_mask]
+            image_values = image_values[inter_mask]
+
         if len(image.shape) == 2:
             image_values = image.astype(np.float32).reshape(-1)
         elif len(image.shape) == 3:
             image_values = image[:, :, 0].astype(np.float32).reshape(-1)
         else:
             raise NotImplementedError
+
+
 
         inter_func = LinearNDInterpolator(
             points=transformed_coordinates,
@@ -81,11 +88,13 @@ class BaseTransform(object):
             y_coord,
         )
 
-        return transformed_image_values.reshape(*shape)
+        transformed_image = transformed_image_values.reshape(*shape)
+
+        return transformed_image
 
 
 
-    def apply_transformation_to_coordinates(self, coords: np.ndarray, depth: Optional[np.array] = None) -> np.ndarray:
+    def apply_transformation_to_coordinates(self, coords: np.ndarray, depth: Optional[np.array] = None) -> np.ndarray | Tuple[np.ndarray, np.ndarray]:
         """apply transformation to image coordinates
 
         Args:
