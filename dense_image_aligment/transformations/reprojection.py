@@ -6,6 +6,7 @@ from scipy.interpolate import LinearNDInterpolator
 
 from .basic_transformation import BaseTransform
 from .coords_utils import hom_coords, rotation_matrix
+from .differential_utils import G_matrix
 
 
 class ProjectionTransformation(BaseTransform):
@@ -76,6 +77,10 @@ class ProjectionPseudoInvTransformation(BaseTransform):
         return coords_new
 
 
+    def jacobian(self, x: np.array, p_c: ndarray) -> ndarray:
+        raise NotImplementedError
+
+
 class RT_Transformation(BaseTransform):
     n: int = 6
     p: np.ndarray = np.zeros(6, dtype=np.float32)
@@ -104,6 +109,22 @@ class RT_Transformation(BaseTransform):
         coords_new = coords_new[:, :3]
 
         return coords_new
+
+
+    def jacobian(self, x: np.array, p_c: ndarray) -> ndarray:
+
+        transformed_coordinates = self.apply_transformation_to_coordinates(coords=x)
+        transformed_coordinates = hom_coords(transformed_coordinates) # N x 4
+
+        jacobian = []
+
+        for i in range(self.n):
+            G_i = G_matrix(i)
+            jacobian.append(np.einsum('kl,nl->nk', G_i, transformed_coordinates)[:, :3]) # N x 3
+
+        jacobian = np.stack(jacobian, axis=-1) # N x 3 x 6
+
+        return jacobian # N x 3 x 6
 
 
 class ReprojectionTransformation(BaseTransform):
@@ -192,3 +213,11 @@ class ReprojectionTransformation(BaseTransform):
         transformed_image[values_mask] = transformed_image_values.reshape(*shape)[values_mask]
 
         return transformed_image
+
+
+    def jacobian(self, x: np.array, p_c: ndarray) -> ndarray:
+        jacobian_proj_inv = self.camera_projection_inv.jacobian(x=x, p_c=p_c) # N x 2 x 3
+        jacobian_RT = self.RT.jacobian(x=x, p_c=p_c) # N x 3 x 6
+
+        jacobian = np.einsum('NxX,NXp->Nxp', jacobian_proj_inv, jacobian_RT)
+        return jacobian
