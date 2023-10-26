@@ -1,8 +1,10 @@
+from tabnanny import verbose
 from typing import Optional, Tuple
 
 import numpy as np
 from numpy import ndarray
 from scipy.interpolate import LinearNDInterpolator
+from tqdm import tqdm
 
 from .basic_transformation import BaseTransform
 from .coords_utils import hom_coords, rotation_matrix
@@ -17,15 +19,17 @@ class ProjectionTransformation(BaseTransform):
             assert p_init.shape == (self.n,), f'Wrong parameters shape, given: {p_init.shape}'
             self.p = p_init
 
-    def apply_transformation_to_coordinates(self, coords: ndarray) -> Tuple[ndarray]:
-        """_summary_
+    def apply_transformation_to_coordinates(self, coords: ndarray) -> Tuple[ndarray, ndarray]:
 
-        Args:
-            coords (ndarray): n x 3, X coordinates in camera Space
+        # """_summary_
 
-        Returns:
-            ndarray: n x 2, points coordinates in image coordinates system
-        """
+        # Args:
+        #     coords (ndarray): n x 3, X coordinates in camera Space
+
+        # Returns:
+        #     ndarray: n x 2, points coordinates in image coordinates system
+        #     ndarray:
+        # """
         projection_matrix = self.p.reshape(3, 3)
 
         coords_new = np.copy(coords)
@@ -33,17 +37,40 @@ class ProjectionTransformation(BaseTransform):
         coords_new[:, 0] /= coords_new[:, 2]
         coords_new[:, 1] /= coords_new[:, 2]
 
-        # mask_visibility = np.zeros(coords_new.shape[0], dtype=np.bool_)
-        # indexes = np.copy(coords_new[:, :2]).round().astype(int)
-        # indexes[:, 0] += indexes[:, 0].min()
-        # indexes[:, 1] += indexes[:, 1].min()
+        h_max = coords_new[:, 0].max()
+        h_min = coords_new[:, 0].min()
+        w_max = coords_new[:, 1].max()
+        w_min = coords_new[:, 1].min()
 
-        # mask = np.zeros((indexes[:, 0].max(), indexes[:, 1].max()), dtype=np.bool_)
-        # mask
+
+        h = round(h_max - h_min)
+        w = round(w_max - w_min)
+
+        mask = ~np.zeros(coords_new.shape[0], dtype=np.bool_)
+        points_om_image = np.zeros((h, w, 2), dtype=np.float32)
+
+        for i, c in tqdm(enumerate(coords_new), desc='Projection Z checking', disable=True):
+            x, y, z = c
+            xi = round(x)
+            yi = round(y)
+
+            current_z, current_i = points_om_image[xi, yi]
+
+            if current_z == 0.:
+                points_om_image[xi, yi, 0] = z
+                points_om_image[xi, yi, 1] = i
+            else:
+                if np.linalg.norm(z - current_z) >= 0.03:
+                    if current_z <= z:
+                        mask[i] = False
+                    else:
+                        mask[int(current_i)] = False
+                        mask[i] = True
+                        points_om_image[xi, yi] = np.array([z, i], dtype=np.float32)
 
         coords_new = coords_new[:, :2]
 
-        return coords_new
+        return coords_new, mask
 
 
 class ProjectionPseudoInvTransformation(BaseTransform):
@@ -144,9 +171,9 @@ class ReprojectionTransformation(BaseTransform):
 
         X = self.camera_projection_inv.apply_transformation_to_coordinates(coords=coords, depth=depth)
         X = self.RT.apply_transformation_to_coordinates(coords=X)
-        x = self.camera_projection.apply_transformation_to_coordinates(coords=X)
+        x, mask = self.camera_projection.apply_transformation_to_coordinates(coords=X)
 
-        return x
+        return x, mask
 
     def apply_transformation(self, image: np.ndarray, shape: Tuple[int, int]) -> np.ndarray:
         """return transformed image
@@ -174,7 +201,7 @@ class ReprojectionTransformation(BaseTransform):
             ]
         ).T # n x 2
 
-        transformed_coordinates = self.apply_transformation_to_coordinates(
+        transformed_coordinates, vizibility_mask = self.apply_transformation_to_coordinates(
             image_pixels_coordinates,
             depth=image[:, :, 1].reshape(-1)
         )
@@ -182,8 +209,8 @@ class ReprojectionTransformation(BaseTransform):
         image_values = image[:, :, 0].astype(np.float32).reshape(-1)
 
         inter_func = LinearNDInterpolator(
-            points=transformed_coordinates,
-            values=image_values,
+            points=transformed_coordinates[vizibility_mask],
+            values=image_values[vizibility_mask],
             fill_value=0.
         )
 
