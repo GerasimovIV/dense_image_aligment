@@ -72,6 +72,33 @@ class ProjectionTransformation(BaseTransform):
 
         return coords_new, mask
 
+    def jacobian_over_input(self, x: np.array, z: np.ndarray) -> np.ndarray:
+        """_summary_
+
+        Args:
+            x (np.array): N x 2
+
+        Raises:
+            NotImplementedError: _description_
+
+        Returns:
+            np.ndarray: N x 2 x 3
+        """
+        N = x.shape[0]
+        J1 = np.zeros((N, 2, 3))
+
+        z_non_zero_mask = ~np.isclose(z, 0.)
+
+        J1[z_non_zero_mask, 0, 0] = 1 / z[z_non_zero_mask]
+        J1[z_non_zero_mask, 1, 1] = 1 / z[z_non_zero_mask]
+        J1[z_non_zero_mask, 0, 2] = - x[:, 0] / z[z_non_zero_mask]**2
+        J1[z_non_zero_mask, 1, 2] = - x[:, 1] / z[z_non_zero_mask]**2
+
+        projection_matrix = self.p.reshape(3, 3)
+
+        jacobian = np.einsum('Nkl,lp->kp', J1, projection_matrix)
+        return jacobian
+
 
 class ProjectionPseudoInvTransformation(BaseTransform):
     n: int = 9
@@ -139,7 +166,8 @@ class RT_Transformation(BaseTransform):
 
 
     def jacobian(self, x: np.array, p_c: ndarray) -> ndarray:
-
+        previous_values = np.copy(self.p)
+        self.p = p_c
         transformed_coordinates = self.apply_transformation_to_coordinates(coords=x)
         transformed_coordinates = hom_coords(transformed_coordinates) # N x 4
 
@@ -150,6 +178,8 @@ class RT_Transformation(BaseTransform):
             jacobian.append(np.einsum('kl,nl->nk', G_i, transformed_coordinates)[:, :3]) # N x 3
 
         jacobian = np.stack(jacobian, axis=-1) # N x 3 x 6
+
+        self.p = previous_values
 
         return jacobian # N x 3 x 6
 
@@ -171,11 +201,16 @@ class ReprojectionTransformation(BaseTransform):
 
         X = self.camera_projection_inv.apply_transformation_to_coordinates(coords=coords, depth=depth)
         X = self.RT.apply_transformation_to_coordinates(coords=X)
+        depth = np.copy(X[:, 2:3])
         x, mask = self.camera_projection.apply_transformation_to_coordinates(coords=X)
-
+        x = np.concatenate([x, depth], axis=-1)
         return x, mask
 
-    def apply_transformation(self, image: np.ndarray, shape: Tuple[int, int]) -> np.ndarray:
+    def apply_transformation(
+        self,
+        image: Tuple[np.ndarray, np.ndarray],
+        shape: Tuple[int, int]
+    ) -> Tuple[np.ndarray, np.ndarray]:
         """return transformed image
 
         Args:
@@ -188,10 +223,13 @@ class ReprojectionTransformation(BaseTransform):
             np.array: _description_
         """
 
-        assert len(image.shape) == 3 or len(image.shape) == 3, f'image shape = {image.shape}'
+        assert isinstance(image, Tuple)
 
-        x_coord = np.arange(image.shape[1], dtype=np.float32) - float(image.shape[1]) / 2
-        y_coord = np.arange(image.shape[0], dtype=np.float32) - float(image.shape[0]) / 2
+        intensity_image_origin = image[0]
+        depth_image_origin = image[1]
+
+        x_coord = np.arange(intensity_image_origin.shape[1], dtype=np.float32) - float(intensity_image_origin.shape[1]) / 2
+        y_coord = np.arange(intensity_image_origin.shape[0], dtype=np.float32) - float(intensity_image_origin.shape[0]) / 2
         x_coord, y_coord = np.meshgrid(x_coord, y_coord, indexing='xy')
 
         image_pixels_coordinates = np.vstack(
@@ -203,13 +241,13 @@ class ReprojectionTransformation(BaseTransform):
 
         transformed_coordinates, vizibility_mask = self.apply_transformation_to_coordinates(
             image_pixels_coordinates,
-            depth=image[:, :, 1].reshape(-1)
+            depth_image_origin.reshape(-1)
         )
 
-        image_values = image[:, :, 0].astype(np.float32).reshape(-1)
+        image_values = intensity_image_origin.astype(np.float32).reshape(-1)
 
         inter_func = LinearNDInterpolator(
-            points=transformed_coordinates[vizibility_mask],
+            points=transformed_coordinates[vizibility_mask, :2],
             values=image_values[vizibility_mask],
             fill_value=0.
         )
@@ -224,9 +262,9 @@ class ReprojectionTransformation(BaseTransform):
             y_coord,
         )
 
-        indexes = np.copy(transformed_coordinates)
-        indexes[:, 0] += float(image.shape[1]) / 2
-        indexes[:, 1] += float(image.shape[0]) / 2
+        indexes = np.copy(transformed_coordinates[:, :2])
+        indexes[:, 0] += float(intensity_image_origin.shape[1]) / 2
+        indexes[:, 1] += float(intensity_image_origin.shape[0]) / 2
         indexes = indexes.round().astype(int)
         indexes = indexes[indexes[:, 0] >= 0]
         indexes = indexes[indexes[:, 0] < shape[1]]
@@ -236,14 +274,37 @@ class ReprojectionTransformation(BaseTransform):
         values_mask = np.zeros(shape, dtype=np.bool_)
         values_mask[indexes[:, 1], indexes[:, 0]] = 1
 
+
         transformed_image = np.zeros(shape, dtype=transformed_image_values.dtype)
         transformed_image[values_mask] = transformed_image_values.reshape(*shape)[values_mask]
 
-        return transformed_image
+        indexes = np.copy(transformed_coordinates[vizibility_mask, :2])
+        indexes[:, 0] += float(intensity_image_origin.shape[1]) / 2
+        indexes[:, 1] += float(intensity_image_origin.shape[0]) / 2
+        indexes = indexes.round().astype(int)
+
+        depth_values = np.copy(transformed_coordinates[vizibility_mask, 2:3])
+        depth_image = np.zeros(shape, dtype=transformed_image_values.dtype)
+
+        depth_values = depth_values[indexes[:, 0] >= 0]
+        indexes = indexes[indexes[:, 0] >= 0]
+
+        depth_values = depth_values[indexes[:, 0] < shape[1]]
+        indexes = indexes[indexes[:, 0] < shape[1]]
+
+        depth_values = depth_values[indexes[:, 1] >= 0]
+        indexes = indexes[indexes[:, 1] >= 0]
+
+        depth_values = depth_values[indexes[:, 1] < shape[0]]
+        indexes = indexes[indexes[:, 1] < shape[0]]
+
+        depth_image[indexes[:, 1], indexes[:, 0]] = depth_values[:, 0]
+
+        return transformed_image, depth_image
 
 
-    def jacobian(self, x: np.array, p_c: ndarray) -> ndarray:
-        jacobian_proj_inv = self.camera_projection_inv.jacobian(x=x, p_c=p_c) # N x 2 x 3
+    def jacobian(self, x: np.array, p_c: ndarray, z: np.ndarray) -> ndarray:
+        jacobian_proj_inv = self.camera_projection.jacobian_over_input(x=x, z=z) # N x 2 x 3
         jacobian_RT = self.RT.jacobian(x=x, p_c=p_c) # N x 3 x 6
 
         jacobian = np.einsum('NxX,NXp->Nxp', jacobian_proj_inv, jacobian_RT)

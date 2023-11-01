@@ -11,7 +11,7 @@ from .utils import compute_H, compute_image_grad, compute_J
 
 def forward_additive(
     template: np.ndarray,
-    image: np.ndarray,
+    image: np.ndarray | Tuple[np.ndarray, np.ndarray],
     coord_transform: BaseTransform,
     p_init: Optional[np.ndarray] = None,
     max_iterations: int = 200,
@@ -63,6 +63,8 @@ def forward_additive(
         H_inv = np.linalg.inv(H) # n x n
         # H_inv = 1 / H
 
+        if isinstance(I_W, Tuple):
+            I_W = I_W[0]
         diff = template.reshape(-1) - I_W.reshape(-1)
         right_part = np.einsum('Nn,N->n', J, diff) # n
 

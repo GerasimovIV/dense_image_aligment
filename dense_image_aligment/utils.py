@@ -66,7 +66,7 @@ def compute_image_grad(image: np.ndarray) -> np.ndarray:
 
 
 def compute_J(
-    image: np.ndarray,
+    image: np.ndarray | Tuple[np.ndarray, np.ndarray],
     coord_transform: BaseTransform,
     p_c: np.ndarray,
 ) -> np.ndarray:
@@ -74,7 +74,8 @@ def compute_J(
         where N is a number of pixels and n is the nuber of warp parameters
 
     Args:
-        image (np.ndarray): image (I)
+        image (np.ndarray | Tuple[np.ndarray, np.ndarray]): image (I) or
+            image and depth image (in absolute values: meters)
         coord_transform (BaseTransform): warp coordinates (W)
         p_c (np.ndarray): set of parameters for W
 
