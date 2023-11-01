@@ -186,14 +186,22 @@ class RT_Transformation(BaseTransform):
 
 class ReprojectionTransformation(BaseTransform):
     n: 6
-    p: np.ndarray = np.zeros(6, dtype=np.float32)
+    __p__: np.ndarray = np.zeros(6, dtype=np.float32)
 
     def __init__(self, p_init: np.ndarray, intrinsic: np.ndarray) -> None:
-        super().__init__(p_init)
-
         self.camera_projection = ProjectionTransformation(intrinsic)
         self.camera_projection_inv = ProjectionPseudoInvTransformation(intrinsic)
         self.RT = RT_Transformation(p_init=p_init)
+        super().__init__(p_init)
+
+    @property
+    def p(self) -> np.ndarray:
+        return self.__p__
+
+    @p.setter
+    def p(self, v: np.ndarray) -> None:
+        self.__p__ = v
+        self.RT.p = v
 
 
     def apply_transformation_to_coordinates(self, coords: np.ndarray, depth: Optional[np.array] = None) -> np.ndarray:
