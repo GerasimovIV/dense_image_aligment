@@ -91,12 +91,12 @@ class ProjectionTransformation(BaseTransform):
 
         J1[z_non_zero_mask, 0, 0] = 1 / z[z_non_zero_mask]
         J1[z_non_zero_mask, 1, 1] = 1 / z[z_non_zero_mask]
-        J1[z_non_zero_mask, 0, 2] = - x[:, 0] / z[z_non_zero_mask]**2
-        J1[z_non_zero_mask, 1, 2] = - x[:, 1] / z[z_non_zero_mask]**2
+        J1[z_non_zero_mask, 0, 2] = - x[z_non_zero_mask, 0] / z[z_non_zero_mask]**2
+        J1[z_non_zero_mask, 1, 2] = - x[z_non_zero_mask, 1] / z[z_non_zero_mask]**2
 
         projection_matrix = self.p.reshape(3, 3)
 
-        jacobian = np.einsum('Nkl,lp->kp', J1, projection_matrix)
+        jacobian = np.einsum('Nkl,lp->Nkp', J1, projection_matrix)
         return jacobian
 
 
@@ -305,7 +305,8 @@ class ReprojectionTransformation(BaseTransform):
 
     def jacobian(self, x: np.array, p_c: ndarray, z: np.ndarray) -> ndarray:
         jacobian_proj_inv = self.camera_projection.jacobian_over_input(x=x, z=z) # N x 2 x 3
-        jacobian_RT = self.RT.jacobian(x=x, p_c=p_c) # N x 3 x 6
+        X = self.camera_projection_inv.apply_transformation_to_coordinates(coords=x, depth=z)
+        jacobian_RT = self.RT.jacobian(x=X, p_c=p_c) # N x 3 x 6
 
         jacobian = np.einsum('NxX,NXp->Nxp', jacobian_proj_inv, jacobian_RT)
         return jacobian

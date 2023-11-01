@@ -83,8 +83,14 @@ def compute_J(
         np.ndarray: computed for each pixel J(x, p_c), i.e. matrix with shape N x n
         where N is the number of pixels and n is the number of warp parameters
     """
-    nabla_I, x = compute_image_grad(image) # N x 2
-    warp_jacobian = coord_transform.jacobian(x=x, p_c=p_c) # N x 2 x n
+    if isinstance(image, Tuple):
+        nabla_I, x = compute_image_grad(image[0]) # N x 2
+        warp_jacobian = coord_transform.jacobian(x=x, p_c=p_c, z=image[1].reshape(-1)) # N x 2 x n
+
+    else:
+        nabla_I, x = compute_image_grad(image) # N x 2
+        warp_jacobian = coord_transform.jacobian(x=x, p_c=p_c) # N x 2 x n
+
     J = np.einsum('ij,ijk->ik', nabla_I, warp_jacobian) # N x n
     return J
 
