@@ -18,6 +18,7 @@ def forward_additive(
     convergence_threshold: float = 1e-4,
     alpha: float = 1.,
     verbose: bool = True,
+    ps: List[np.ndarray] = [],
 ) -> List[np.ndarray]:
     '''Lucas-Kanade forward additive method (Fig. 1) for affine warp model.
 
@@ -46,7 +47,7 @@ def forward_additive(
 
     p_c = copy(p_init) if p_init is not None else copy(coord_transform.p)
 
-    ps = [p_c]
+    ps.append(p_c)
 
     for it in progression_bar:
         coord_transform.p = p_c
