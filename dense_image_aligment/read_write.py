@@ -93,8 +93,8 @@ def show_data(
 
     h, w = image.shape
     h, w = float(h), float(w)
-    a = np.array([[w/2, w/2, -w/2, -w/2],
-                  [h/2, -h/2, -h/2, h/2]], dtype=np.float32).T
+    a = np.array([[w, w, 0., 0.],
+                  [h, 0., 0., h]], dtype=np.float32).T
 
     b = coords_transform.apply_transformation_to_coordinates(
         coords=a
@@ -103,7 +103,7 @@ def show_data(
     fig, axs = plt.subplots()
     h, w = image_with_template.shape[:2]
     h, w = float(h), float(w)
-    axs.matshow(image_with_template, cmap=plt.cm.gray, extent=[-w/2, w/2, -h/2, h/2], origin='lower')
+    axs.matshow(image_with_template, cmap=plt.cm.gray, extent=[0., w, 0., h], origin='lower')
     axs.plot(b[0, [0, 1, 2, 3, 0]], b[1, [0, 1, 2, 3, 0]], '-or', linewidth=1)
 
 
@@ -159,8 +159,8 @@ def save_aligment_progress(
 
         h, w = image.shape
         h, w = float(h), float(w)
-        a = np.array([[w/2, w/2, -w/2, -w/2],
-                    [h/2, -h/2, -h/2, h/2]], dtype=np.float32).T
+        a = np.array([[w, w, 0., 0.],
+                    [h, 0., 0., h]], dtype=np.float32).T
 
         b = coords_transform.apply_transformation_to_coordinates(
             coords=a
@@ -168,7 +168,7 @@ def save_aligment_progress(
 
         h, w = image_with_template.shape[:2]
         h, w = float(h), float(w)
-        axs.matshow(image_with_template, cmap=plt.cm.gray, extent=[-w/2, w/2, -h/2, h/2], origin='lower')
+        axs.matshow(image_with_template, cmap=plt.cm.gray, extent=[0., w, 0., h], origin='lower')
 
         axs.plot(b[0, [0, 1, 2, 3, 0]], b[1, [0, 1, 2, 3, 0]], '-or')
 

@@ -54,19 +54,21 @@ class ProjectionTransformation(BaseTransform):
             xi = round(x)
             yi = round(y)
 
-            current_z, current_i = points_om_image[xi, yi]
+            if xi < points_om_image.shape[0] and yi < points_om_image.shape[1]:
 
-            if current_z == 0.:
-                points_om_image[xi, yi, 0] = z
-                points_om_image[xi, yi, 1] = i
-            else:
-                if np.linalg.norm(z - current_z) >= 0.03:
-                    if current_z <= z:
-                        mask[i] = False
-                    else:
-                        mask[int(current_i)] = False
-                        mask[i] = True
-                        points_om_image[xi, yi] = np.array([z, i], dtype=np.float32)
+                current_z, current_i = points_om_image[xi, yi]
+
+                if current_z == 0.:
+                    points_om_image[xi, yi, 0] = z
+                    points_om_image[xi, yi, 1] = i
+                else:
+                    if np.linalg.norm(z - current_z) >= 0.03:
+                        if current_z <= z:
+                            mask[i] = False
+                        else:
+                            mask[int(current_i)] = False
+                            mask[i] = True
+                            points_om_image[xi, yi] = np.array([z, i], dtype=np.float32)
 
         coords_new = coords_new[:, :2]
 
@@ -236,8 +238,8 @@ class ReprojectionTransformation(BaseTransform):
         intensity_image_origin = image[0]
         depth_image_origin = image[1]
 
-        x_coord = np.arange(intensity_image_origin.shape[1], dtype=np.float32) - float(intensity_image_origin.shape[1]) / 2
-        y_coord = np.arange(intensity_image_origin.shape[0], dtype=np.float32) - float(intensity_image_origin.shape[0]) / 2
+        x_coord = np.arange(intensity_image_origin.shape[1], dtype=np.float32) #- float(intensity_image_origin.shape[1]) / 2
+        y_coord = np.arange(intensity_image_origin.shape[0], dtype=np.float32) #- float(intensity_image_origin.shape[0]) / 2
         x_coord, y_coord = np.meshgrid(x_coord, y_coord, indexing='xy')
 
         image_pixels_coordinates = np.vstack(
@@ -260,8 +262,8 @@ class ReprojectionTransformation(BaseTransform):
             fill_value=0.
         )
 
-        x_coord = np.arange(shape[1], dtype=np.float32) - float(shape[1]) / 2
-        y_coord = np.arange(shape[0], dtype=np.float32) - float(shape[0]) / 2
+        x_coord = np.arange(shape[1], dtype=np.float32) #- float(shape[1]) / 2
+        y_coord = np.arange(shape[0], dtype=np.float32) #- float(shape[0]) / 2
 
         x_coord, y_coord = np.meshgrid(x_coord, y_coord, indexing='xy')  # 2D grid for interpolation
 
@@ -271,8 +273,8 @@ class ReprojectionTransformation(BaseTransform):
         )
 
         indexes = np.copy(transformed_coordinates[:, :2])
-        indexes[:, 0] += float(intensity_image_origin.shape[1]) / 2
-        indexes[:, 1] += float(intensity_image_origin.shape[0]) / 2
+        # indexes[:, 0] += float(intensity_image_origin.shape[1]) / 2
+        # indexes[:, 1] += float(intensity_image_origin.shape[0]) / 2
         indexes = indexes.round().astype(int)
         indexes = indexes[indexes[:, 0] >= 0]
         indexes = indexes[indexes[:, 0] < shape[1]]
@@ -287,8 +289,8 @@ class ReprojectionTransformation(BaseTransform):
         transformed_image[values_mask] = transformed_image_values.reshape(*shape)[values_mask]
 
         indexes = np.copy(transformed_coordinates[vizibility_mask, :2])
-        indexes[:, 0] += float(intensity_image_origin.shape[1]) / 2
-        indexes[:, 1] += float(intensity_image_origin.shape[0]) / 2
+        # indexes[:, 0] += float(intensity_image_origin.shape[1]) / 2
+        # indexes[:, 1] += float(intensity_image_origin.shape[0]) / 2
         indexes = indexes.round().astype(int)
 
         depth_values = np.copy(transformed_coordinates[vizibility_mask, 2:3])

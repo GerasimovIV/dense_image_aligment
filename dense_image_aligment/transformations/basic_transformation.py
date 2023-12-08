@@ -37,8 +37,8 @@ class BaseTransform(object):
 
         assert len(image.shape) == 2 or len(image.shape) == 3, f'image shape = {image.shape}'
 
-        x_coord = np.arange(image.shape[1], dtype=np.float32) - float(image.shape[1]) / 2
-        y_coord = np.arange(image.shape[0], dtype=np.float32) - float(image.shape[0]) / 2
+        x_coord = np.arange(image.shape[1], dtype=np.float32) #- float(image.shape[1]) / 2
+        y_coord = np.arange(image.shape[0], dtype=np.float32) #- float(image.shape[0]) / 2
         x_coord, y_coord = np.meshgrid(x_coord, y_coord, indexing='xy')
 
         image_pixels_coordinates = np.vstack(
@@ -78,8 +78,8 @@ class BaseTransform(object):
             fill_value=0.
         )
 
-        x_coord = np.arange(shape[1], dtype=np.float32) - float(shape[1]) / 2
-        y_coord = np.arange(shape[0], dtype=np.float32) - float(shape[0]) / 2
+        x_coord = np.arange(shape[1], dtype=np.float32) #- float(shape[1]) / 2
+        y_coord = np.arange(shape[0], dtype=np.float32) #- float(shape[0]) / 2
 
         x_coord, y_coord = np.meshgrid(x_coord, y_coord, indexing='xy')  # 2D grid for interpolation
 
